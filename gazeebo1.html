@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gazeebo LLC — Private Portal</title>
+
+<!-- Tailwind CSS via CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- Amazon Cognito Identity SDK -->
+<script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink:      { DEFAULT: '#0F1B2D', 800: '#152840', 700: '#1C3350', 600: '#274268' },
+          parchment:{ DEFAULT: '#F5F2EA', 400: '#E7E1D2' },
+          brass:    { DEFAULT: '#C9A227', 400: '#DCC062', 300: '#E9D896' },
+          verdigris:{ DEFAULT: '#4C8C82', 400: '#6FA79D' },
+          rust:     { DEFAULT: '#B0483C' },
+        },
+        fontFamily: {
+          display: ['Fraunces', 'serif'],
+          body: ['Inter', 'sans-serif'],
+          mono: ['JetBrains Mono', 'monospace'],
+        },
+        boxShadow: {
+          card: '0 20px 60px -15px rgba(15, 27, 45, 0.5)',
+        },
+      },
+    },
+  };
+</script>
+
+<style>
+  .seal-ring {
+    background: repeating-conic-gradient(from 0deg, rgba(201,162,39,0.16) 0deg 2deg, transparent 2deg 6deg);
+    border-radius: 9999px;
+  }
+  .auth-panel { transition: opacity 300ms ease, transform 300ms ease; }
+  .auth-panel[data-hidden="true"] { opacity: 0; transform: translateY(6px); position: absolute; pointer-events: none; }
+  .auth-panel[data-hidden="false"] { opacity: 1; transform: translateY(0); position: relative; }
+  
+  .view-fade { transition: opacity 400ms ease, transform 400ms ease; }
+  .view-fade[data-hidden="true"] { opacity: 0; transform: translateY(10px) scale(0.99); position: absolute; inset: 0; pointer-events: none; }
+  .view-fade[data-hidden="false"] { opacity: 1; transform: translateY(0) scale(1); position: relative; }
+
+  .subview { display: none; }
+  .subview.active { display: block; }
+
+  #tab-indicator { transition: transform 280ms cubic-bezier(0.65, 0, 0.35, 1); }
+  .focus-brass:focus-visible { outline: 2px solid #C9A227; outline-offset: 2px; }
+  body { font-family: 'Inter', sans-serif; }
+</style>
+</head>
+
+<body class="min-h-screen bg-ink text-parchment antialiased">
+
+  <div id="app" class="relative min-h-screen overflow-hidden">
+
+    <div class="seal-ring pointer-events-none absolute -top-40 -right-40 w-[560px] h-[560px] opacity-60"></div>
+    <div class="seal-ring pointer-events-none absolute -bottom-52 -left-40 w-[480px] h-[480px] opacity-40"></div>
+
+    <!-- ---------------------------------------------------------- -->
+    <!-- VIEW 1: AUTH (Sign In / Create Account)                    -->
+    <!-- ---------------------------------------------------------- -->
+    <main id="view-auth" class="view-fade relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-12" data-hidden="false">
+      <div class="mb-8 text-center">
+        <div class="mx-auto mb-4 w-14 h-14 rounded-full border-2 border-brass flex items-center justify-center">
+          <span class="font-display text-brass text-xl">G</span>
+        </div>
+        <h1 class="font-display text-3xl sm:text-4xl font-medium tracking-tight text-parchment">Gazeebo Private</h1>
+        <p class="mt-2 text-sm text-parchment-400/70 font-mono tracking-wide uppercase">Friends &amp; Family Media Vault</p>
+      </div>
+
+      <div class="w-full max-w-md bg-ink-800 border border-ink-600 rounded-2xl shadow-card overflow-hidden">
+        <div class="relative grid grid-cols-2 border-b border-ink-600 bg-ink-700/60">
+          <div id="tab-indicator" class="absolute inset-y-0 left-0 w-1/2 bg-ink-600/80 border-b-2 border-brass"></div>
+          <button id="tab-signin" type="button" class="focus-brass relative z-10 py-4 text-sm font-semibold tracking-wide transition-colors text-parchment" aria-selected="true">Sign In</button>
+          <button id="tab-signup" type="button" class="focus-brass relative z-10 py-4 text-sm font-semibold tracking-wide transition-colors text-parchment/50" aria-selected="false">Create Account</button>
+        </div>
+
+        <div class="relative p-8">
+          <div id="auth-alert" class="hidden mb-5 rounded-lg border border-rust/50 bg-rust/10 text-rust text-sm px-4 py-3"></div>
+
+          <!-- SIGN IN PANEL -->
+          <form id="form-signin" class="auth-panel space-y-5" data-hidden="false" novalidate>
+            <div>
+              <label for="signin-email" class="block text-xs font-mono uppercase tracking-wide text-parchment/60 mb-1.5">Email</label>
+              <input id="signin-email" type="email" autocomplete="email" placeholder="you@example.com" class="focus-brass w-full bg-ink-700 border border-ink-600 rounded-lg px-4 py-2.5 text-sm text-parchment placeholder:text-parchment/30 outline-none" />
+              <p class="error-text hidden mt-1.5 text-xs text-rust"></p>
+            </div>
+            <div>
+              <label for="signin-password" class="block text-xs font-mono uppercase tracking-wide text-parchment/60 mb-1.5">Password</label>
+              <input id="signin-password" type="password" autocomplete="current-password" placeholder="••••••••" class="focus-brass w-full bg-ink-700 border border-ink-600 rounded-lg px-4 py-2.5 text-sm text-parchment placeholder:text-parchment/30 outline-none" />
+              <p class="error-text hidden mt-1.5 text-xs text-rust"></p>
+            </div>
+            <button type="submit" class="focus-brass w-full bg-brass hover:bg-brass-400 text-ink font-semibold text-sm rounded-lg py-3 transition-colors flex items-center justify-center gap-2">
+              <span class="btn-label">Access Vault</span>
+            </button>
+          </form>
+
+          <!-- CREATE ACCOUNT PANEL -->
+          <form id="form-signup" class="auth-panel space-y-5" data-hidden="true" novalidate>
+            <div>
+              <label for="signup-name" class="block text-xs font-mono uppercase tracking-wide text-parchment/60 mb-1.5">Full Name</label>
+              <input id="signup-name" type="text" autocomplete="name" placeholder="Alex Smith" class="focus-brass w-full bg-ink-700 border border-ink-600 rounded-lg px-4 py-2.5 text-sm text-parchment placeholder:text-parchment/30 outline-none" />
+              <p class="error-text hidden mt-1.5 text-xs text-rust"></p>
+            </div>
+            <div>
+              <label for="signup-email" class="block text-xs font-mono uppercase tracking-wide text-parchment/60 mb-1.5">Email</label>
+              <input id="signup-email" type="email" autocomplete="email" placeholder="you@example.com" class="focus-brass w-full bg-ink-700 border border-ink-600 rounded-lg px-4 py-2.5 text-sm text-parchment placeholder:text-parchment/30 outline-none" />
+              <p class="error-text hidden mt-1.5 text-xs text-rust"></p>
+            </div>
+            <div>
+              <label for="signup-password" class="block text-xs font-mono uppercase tracking-wide text-parchment/60 mb-1.5">Password</label>
+              <input id="signup-password" type="password" autocomplete="new-password" placeholder="••••••••" class="focus-brass w-full bg-ink-700 border border-ink-600 rounded-lg px-4 py-2.5 text-sm text-parchment placeholder:text-parchment/30 outline-none" />
+              <p class="mt-1.5 text-xs text-parchment/40">Min 8 chars, 1 uppercase letter, 1 number.</p>
+              <p class="error-text hidden mt-1.5 text-xs text-rust"></p>
+            </div>
+            <button type="submit" class="focus-brass w-full bg-brass hover:bg-brass-400 text-ink font-semibold text-sm rounded-lg py-3 transition-colors flex items-center justify-center gap-2">
+              <span class="btn-label">Register Account</span>
+            </button>
+          </form>
+
+          <!-- CONFIRM CODE SUB-STEP -->
+          <form id="form-confirm" class="auth-panel space-y-5" data-hidden="true" novalidate>
+            <p class="text-sm text-parchment/70">Enter verification code sent to <span id="confirm-email-echo" class="text-brass font-mono"></span>.</p>
+            <div>
+              <label for="confirm-code" class="block text-xs font-mono uppercase tracking-wide text-parchment/60 mb-1.5">Code</label>
+              <input id="confirm-code" type="text" inputmode="numeric" placeholder="123456" class="focus-brass w-full bg-ink-700 border border-ink-600 rounded-lg px-4 py-2.5 text-sm text-parchment tracking-widest outline-none" />
+              <p class="error-text hidden mt-1.5 text-xs text-rust"></p>
+            </div>
+            <button type="submit" class="focus-brass w-full bg-verdigris hover:bg-verdigris-400 text-ink font-semibold text-sm rounded-lg py-3 transition-colors">Verify Code</button>
+          </form>
+        </div>
+      </div>
+    </main>
+
+    <!-- ---------------------------------------------------------- -->
+    <!-- VIEW 2: MEMBER DASHBOARD (Home, Photos, Chat Tabs)         -->
+    <!-- ---------------------------------------------------------- -->
+    <main id="view-dashboard" class="view-fade relative z-10 min-h-screen px-4 py-8 sm:px-8 max-w-5xl mx-auto flex flex-col" data-hidden="true">
+      
+      <!-- Top Navigation Header -->
+      <header class="flex flex-col sm:flex-row items-center justify-between pb-6 mb-8 border-b border-ink-600 gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full border border-brass flex items-center justify-center bg-ink-700">
+            <span class="font-display text-brass text-sm">G</span>
+          </div>
+          <div>
+            <p class="font-mono text-[10px] uppercase tracking-widest text-brass">Private Vault</p>
+            <h1 class="font-display text-lg font-medium">Gazeebo Friends</h1>
+          </div>
+        </div>
+
+        <!-- Navigation Tab Switchers -->
+        <nav class="flex items-center bg-ink-800 p-1 rounded-xl border border-ink-600">
+          <button data-target="home" class="nav-tab px-4 py-2 text-xs font-mono uppercase tracking-wider rounded-lg transition-colors bg-ink-600 text-brass">Home</button>
+          <button data-target="photos" class="nav-tab px-4 py-2 text-xs font-mono uppercase tracking-wider rounded-lg transition-colors text-parchment/60 hover:text-parchment">Photos</button>
+          <button data-target="chat" class="nav-tab px-4 py-2 text-xs font-mono uppercase tracking-wider rounded-lg transition-colors text-parchment/60 hover:text-parchment">Chat</button>
+        </nav>
+
+        <button id="btn-sign-out" class="focus-brass text-xs font-mono uppercase tracking-wider border border-ink-600 hover:border-rust text-parchment/70 hover:text-rust rounded-lg px-3 py-2 transition-colors">
+          Sign Out
+        </button>
+      </header>
+
+      <!-- SUB-VIEW 1: HOME LANDING -->
+      <section id="subview-home" class="subview active space-y-6 flex-1">
+        <div class="rounded-2xl border border-brass/30 bg-gradient-to-br from-ink-700 to-ink-800 p-6 sm:p-8 shadow-card relative overflow-hidden flex flex-col sm:flex-row items-center gap-6">
+          <div class="w-24 h-24 rounded-full border-2 border-brass bg-ink-600 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+            <span id="user-initials" class="font-display text-2xl text-brass">--</span>
+          </div>
+          <div class="text-center sm:text-left flex-1">
+            <p class="font-mono text-xs uppercase tracking-widest text-parchment/40">Authenticated Member</p>
+            <h2 id="dash-member-name" class="font-display text-3xl mt-1">Welcome</h2>
+            <p id="dash-member-email" class="font-mono text-xs text-brass mt-1"></p>
+          </div>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-6">
+          <div class="rounded-2xl border border-ink-600 bg-ink-800 p-6">
+            <h3 class="font-display text-lg mb-2">Vault Activity</h3>
+            <p class="text-xs text-parchment/60 leading-relaxed">Secure storage active. Use the Photos tab to browse category vaults or upload new memories to share with the group.</p>
+          </div>
+          <div class="rounded-2xl border border-ink-600 bg-ink-800 p-6">
+            <h3 class="font-display text-lg mb-2">Group Status</h3>
+            <p class="text-xs text-verdigris-400 font-mono">● Encrypted &amp; Online (5-6 Members Connected)</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SUB-VIEW 2: PHOTOS WITH SUB-SECTIONS -->
+      <section id="subview-photos" class="subview space-y-6 flex-1">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="font-display text-2xl">Photo Vault</h2>
+            <p class="text-xs text-parchment/50 font-mono mt-0.5">Categorized shared picture library</p>
+          </div>
+          <button class="bg-brass hover:bg-brass-400 text-ink font-semibold text-xs font-mono uppercase tracking-wider rounded-lg px-4 py-2.5 transition-colors self-start">
+            + Upload Photo
+          </button>
+        </div>
+
+        <!-- Photo Sub-section Filters -->
+        <div class="flex items-center gap-2 border-b border-ink-600 pb-4 overflow-x-auto">
+          <button data-category="all" class="photo-filter px-3 py-1.5 rounded-lg text-xs font-mono bg-ink-600 text-brass">All Photos</button>
+          <button data-category="outings" class="photo-filter px-3 py-1.5 rounded-lg text-xs font-mono text-parchment/60 hover:text-parchment">Outings</button>
+          <button data-category="workspace" class="photo-filter px-3 py-1.5 rounded-lg text-xs font-mono text-parchment/60 hover:text-parchment">Workspace</button>
+          <button data-category="archives" class="photo-filter px-3 py-1.5 rounded-lg text-xs font-mono text-parchment/60 hover:text-parchment">Archives</button>
+        </div>
+
+        <!-- Photo Grid Layout -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div class="photo-item group relative aspect-square rounded-xl bg-ink-800 border border-ink-600 flex items-center justify-center overflow-hidden" data-cat="outings">
+            <span class="font-mono text-xs text-parchment/30">Outing Snapshot 1</span>
+          </div>
+          <div class="photo-item group relative aspect-square rounded-xl bg-ink-800 border border-ink-600 flex items-center justify-center overflow-hidden" data-cat="workspace">
+            <span class="font-mono text-xs text-parchment/30">Workspace Setup</span>
+          </div>
+          <div class="photo-item group relative aspect-square rounded-xl bg-ink-800 border border-ink-600 flex items-center justify-center overflow-hidden" data-cat="archives">
+            <span class="font-mono text-xs text-parchment/30">Throwback Archive</span>
+          </div>
+          <div class="photo-item group relative aspect-square rounded-xl bg-ink-800 border border-ink-600 flex items-center justify-center overflow-hidden" data-cat="outings">
+            <span class="font-mono text-xs text-parchment/30">Outing Snapshot 2</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- SUB-VIEW 3: REAL-TIME CHAT -->
+      <section id="subview-chat" class="subview flex-1 flex flex-col h-[65vh]">
+        <div class="mb-4">
+          <h2 class="font-display text-2xl">Group Chat</h2>
+          <p class="text-xs text-parchment/50 font-mono mt-0.5">Secure messaging for the circle</p>
+        </div>
+
+        <div class="flex-1 bg-ink-800 border border-ink-600 rounded-2xl p-4 flex flex-col justify-between overflow-hidden shadow-card">
+          <!-- Chat messages area -->
+          <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 pr-2">
+            <div class="flex flex-col items-start">
+              <span class="text-[10px] font-mono text-brass mb-0.5">System</span>
+              <div class="bg-ink-700 border border-ink-600 rounded-xl px-3 py-2 text-xs text-parchment/80 max-w-xs">
+                Welcome to the private Gazeebo chat channel! Send messages below.
+              </div>
+            </div>
+          </div>
+
+          <!-- Message input form -->
+          <form id="form-chat" class="mt-4 flex gap-2 pt-3 border-t border-ink-600">
+            <input id="chat-input" type="text" placeholder="Type a message to the group..." class="focus-brass flex-1 bg-ink-700 border border-ink-600 rounded-lg px-4 py-2.5 text-xs text-parchment placeholder:text-parchment/30 outline-none" autocomplete="off" />
+            <button type="submit" class="bg-brass hover:bg-brass-400 text-ink font-semibold text-xs font-mono uppercase tracking-wider rounded-lg px-4 py-2.5 transition-colors">
+              Send
+            </button>
+          </form>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+<script>
+/* =====================================================================
+   CONFIG & COGNITO INITIALIZATION
+   ===================================================================== */
+const REGION        = "us-east-1";
+const USER_POOL_ID   = "REPLACE_WITH_USER_POOL_ID";
+const CLIENT_ID      = "REPLACE_WITH_APP_CLIENT_ID";
+
+const poolData = { UserPoolId: USER_POOL_ID, ClientId: CLIENT_ID };
+const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+
+/* DOM Elements */
+const tabSignIn   = document.getElementById('tab-signin');
+const tabSignUp   = document.getElementById('tab-signup');
+const tabIndicator= document.getElementById('tab-indicator');
+const formSignIn  = document.getElementById('form-signin');
+const formSignUp  = document.getElementById('form-signup');
+const formConfirm = document.getElementById('form-confirm');
+const authAlert   = document.getElementById('auth-alert');
+const viewAuth      = document.getElementById('view-auth');
+const viewDashboard = document.getElementById('view-dashboard');
+let pendingSignupEmail = "";
+
+/* Tab Switching (Auth) */
+function activateAuthTab(which) {
+  authAlert.classList.add('hidden');
+  const signingIn = which === 'signin';
+  tabIndicator.style.transform = signingIn ? 'translateX(0%)' : 'translateX(100%)';
+  tabSignIn.classList.toggle('text-parchment', signingIn);
+  tabSignIn.classList.toggle('text-parchment/50', !signingIn);
+  tabSignUp.classList.toggle('text-parchment', !signingIn);
+  tabSignUp.classList.toggle('text-parchment/50', signingIn);
+  formSignIn.dataset.hidden = String(!signingIn);
+  formSignUp.dataset.hidden = String(signingIn);
+  formConfirm.dataset.hidden = 'true';
+}
+tabSignIn.addEventListener('click', () => activateAuthTab('signin'));
+tabSignUp.addEventListener('click', () => activateAuthTab('signup'));
+
+/* Dashboard Sub-View Navigation Switcher */
+document.querySelectorAll('.nav-tab').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    const target = e.currentTarget.dataset.target;
+    document.querySelectorAll('.subview').forEach(el => el.classList.remove('active'));
+    document.getElementById(`subview-${target}`).classList.add('active');
+
+    document.querySelectorAll('.nav-tab').forEach(tb => {
+      tb.classList.remove('bg-ink-600', 'text-brass');
+      tb.classList.add('text-parchment/60');
+    });
+    e.currentTarget.classList.add('bg-ink-600', 'text-brass');
+    e.currentTarget.classList.remove('text-parchment/60');
+  });
+});
+
+/* Photo Vault Filtering */
+document.querySelectorAll('.photo-filter').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    const cat = e.currentTarget.dataset.category;
+    document.querySelectorAll('.photo-filter').forEach(f => f.classList.remove('bg-ink-600', 'text-brass'));
+    document.querySelectorAll('.photo-filter').forEach(f => f.classList.add('text-parchment/60'));
+    e.currentTarget.classList.add('bg-ink-600', 'text-brass');
+    e.currentTarget.classList.remove('text-parchment/60');
+
+    document.querySelectorAll('.photo-item').forEach(item => {
+      if (cat === 'all' || item.dataset.cat === cat) {
+        item.style.display = 'flex';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+  });
+});
+
+/* Chat Simulation Handler */
+document.getElementById('form-chat').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const container = document.getElementById('chat-messages');
+  const bubble = document.createElement('div');
+  bubble.className = "flex flex-col items-end";
+  bubble.innerHTML = `
+    <span class="text-[10px] font-mono text-verdigris-400 mb-0.5">You</span>
+    <div class="bg-brass text-ink rounded-xl px-3 py-2 text-xs font-medium max-w-xs shadow-sm">
+      ${escapeHtml(text)}
+    </div>
+  `;
+  container.appendChild(bubble);
+  input.value = '';
+  container.scrollTop = container.scrollHeight;
+});
+
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/* Authentication Logic */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function showAlert(msg) { authAlert.textContent = msg; authAlert.classList.remove('hidden'); }
+
+formSignIn.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const email = document.getElementById('signin-email').value.trim();
+  const password = document.getElementById('signin-password').value;
+  if (!EMAIL_REGEX.test(email) || !password) { showAlert('Provide a valid email and password.'); return; }
+
+  const authDetails = new AmazonCognitoIdentity.AuthenticationDetails({ Username: email, Password: password });
+  const cognitoUser = new AmazonCognitoIdentity.CognitoUser({ Username: email, Pool: userPool });
+
+  cognitoUser.authenticateUser(authDetails, {
+    onSuccess: (session) => {
+      sessionStorage.setItem('cc_id_token', session.getIdToken().getJwtToken());
+      showDashboard({ email, name: email.split('@')[0] });
+    },
+    onFailure: (err) => showAlert(err.message || "Authentication failed.")
+  });
+});
+
+formSignUp.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+
+  if (!name || !EMAIL_REGEX.test(email) || password.length < 8) {
+    showAlert('Please fill out all fields correctly (passwords require 8+ chars, 1 uppercase, 1 number).');
+    return;
+  }
+
+  const attrs = [
+    new AmazonCognitoIdentity.CognitoUserAttribute({ Name: 'email', Value: email }),
+    new AmazonCognitoIdentity.CognitoUserAttribute({ Name: 'name', Value: name })
+  ];
+
+  userPool.signUp(email, password, attrs, null, (err) => {
+    if (err) { showAlert(err.message); return; }
+    pendingSignupEmail = email;
+    document.getElementById('confirm-email-echo').textContent = email;
+    formSignUp.dataset.hidden = 'true';
+    formConfirm.dataset.hidden = 'false';
+  });
+});
+
+formConfirm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const code = document.getElementById('confirm-code').value.trim();
+  if (!code) return;
+
+  const cognitoUser = new AmazonCognitoIdentity.CognitoUser({ Username: pendingSignupEmail, Pool: userPool });
+  cognitoUser.confirmRegistration(code, true, (err) => {
+    if (err) { showAlert(err.message); return; }
+    formConfirm.dataset.hidden = 'true';
+    activateAuthTab('signin');
+    showAlert('Account verified successfully. Please sign in.');
+  });
+});
+
+function showDashboard({ name, email }) {
+  const capitalized = name ? name.charAt(0).toUpperCase() + name.slice(1) : 'Member';
+  document.getElementById('dash-member-name').textContent = capitalized;
+  document.getElementById('dash-member-email').textContent = email;
+  document.getElementById('user-initials').textContent = capitalized.substring(0, 2).toUpperCase();
+
+  viewAuth.dataset.hidden = 'true';
+  viewDashboard.dataset.hidden = 'false';
+}
+
+document.getElementById('btn-sign-out').addEventListener('click', () => {
+  const cu = userPool.getCurrentUser();
+  if (cu) cu.signOut();
+  sessionStorage.removeItem('cc_id_token');
+  formSignIn.reset();
+  formSignUp.reset();
+  activateAuthTab('signin');
+  viewDashboard.dataset.hidden = 'true';
+  viewAuth.dataset.hidden = 'false';
+});
+
+(function restore() {
+  const cu = userPool.getCurrentUser();
+  if (!cu) return;
+  cu.getSession((err, session) => {
+    if (err || !session || !session.isValid()) return;
+    cu.getUserAttributes((err, attrs) => {
+      let email = cu.getUsername();
+      let name = email.split('@')[0];
+      if (!err && attrs) {
+        const n = attrs.find(a => a.getName() === 'name');
+        const e = attrs.find(a => a.getName() === 'email');
+        if (n) name = n.getValue();
+        if (e) email = e.getValue();
+      }
+      showDashboard({ name, email });
+    });
+  });
+})();
+</script>
+</body>
+</html>
