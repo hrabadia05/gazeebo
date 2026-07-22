@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gazeebo — Your Vault</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0a0d13;
+    --ink-2:#0f131c;
+    --panel:rgba(22,27,38,0.62);
+    --panel-strong:rgba(26,32,45,0.78);
+    --line:rgba(232,162,77,0.14);
+    --line-soft:rgba(255,255,255,0.07);
+    --amber:#e8a24d;
+    --amber-soft:rgba(232,162,77,0.16);
+    --moss:#5b9d84;
+    --ivory:#eef1f0;
+    --mute:#8b93a0;
+  }
+  html,body{height:100%}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 12% -10%, rgba(232,162,77,0.10), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 0%, rgba(91,157,132,0.08), transparent 55%),
+      var(--ink);
+    color: var(--ivory);
+    font-family: 'Inter', sans-serif;
+  }
+  .display{ font-family:'Fraunces', serif; }
+  .lattice{
+    background-image:
+      repeating-linear-gradient(45deg, rgba(232,162,77,0.05) 0 1px, transparent 1px 26px),
+      repeating-linear-gradient(-45deg, rgba(232,162,77,0.05) 0 1px, transparent 1px 26px);
+  }
+  .panel{ background: var(--panel); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border:1px solid var(--line-soft); }
+  .panel-strong{ background: var(--panel-strong); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border:1px solid var(--line-soft); }
+  .arch-btn{
+    background: linear-gradient(180deg, rgba(232,162,77,0.18), rgba(232,162,77,0.06));
+    border:1px solid rgba(232,162,77,0.35);
+    border-radius: 999px 999px 14px 14px;
+  }
+  .arch-btn:hover{ background: linear-gradient(180deg, rgba(232,162,77,0.28), rgba(232,162,77,0.10)); }
+  .glow-dot{ box-shadow: 0 0 0 3px rgba(91,157,132,0.15), 0 0 12px rgba(91,157,132,0.6); }
+  .avatar-ring{
+    background: conic-gradient(from 0deg, var(--amber), var(--moss), var(--amber));
+    padding: 3px;
+  }
+  .fade-up{ animation: fadeUp .55s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes fadeUp{ from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:translateY(0)} }
+  .field{
+    background: rgba(255,255,255,0.03);
+    border:1px solid var(--line-soft);
+  }
+  .field:focus{ outline:none; border-color: rgba(232,162,77,0.5); box-shadow:0 0 0 3px rgba(232,162,77,0.12); }
+  ::selection{ background: rgba(232,162,77,0.35); }
+</style>
+</head>
+<body class="min-h-full flex flex-col">
+
+  <!-- Top Navigation -->
+  <header class="relative border-b border-white/5 px-6 sm:px-10 py-5 flex justify-between items-center">
+    <div class="flex items-center gap-2.5">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M13 2 L24 9 L24 10.5 L2 10.5 L2 9 Z" fill="#e8a24d"/>
+        <path d="M4 11.5 L4 22 M9 11.5 L9 22 M13 11.5 L13 22 M17 11.5 L17 22 M22 11.5 L22 22" stroke="#5b9d84" stroke-width="1.1" opacity="0.7"/>
+        <circle cx="13" cy="7" r="1.3" fill="#0a0d13"/>
+      </svg>
+      <span class="display text-lg tracking-tight text-[--ivory]">Gazeebo</span>
+    </div>
+    <div id="navAuthSection" class="flex gap-4 items-center text-sm"></div>
+  </header>
+
+  <!-- Auth View -->
+  <div id="loginView" class="flex-1 flex items-center justify-center px-4 py-16 lattice">
+    <div class="w-full max-w-sm fade-up">
+      <p class="text-center text-xs tracking-[0.25em] uppercase text-[--amber] mb-3">Private &amp; Serverless</p>
+      <h1 class="display text-center text-4xl italic text-[--ivory] mb-8">Welcome back</h1>
+
+      <div class="panel-strong rounded-[28px] p-7 sm:p-8 shadow-2xl shadow-black/50">
+
+        <!-- Tabs -->
+        <div class="grid grid-cols-3 gap-1 p-1 rounded-xl bg-black/20 mb-6 text-xs font-medium">
+          <button id="tabLoginBtn" onclick="window.switchTab('login')" class="py-2 rounded-lg transition-all text-[--ivory] bg-[--amber-soft]">Login</button>
+          <button id="tabRegisterBtn" onclick="window.switchTab('register')" class="py-2 rounded-lg transition-all text-[--mute] hover:text-[--ivory]">Register</button>
+          <button id="tabVerifyBtn" onclick="window.switchTab('verify')" class="py-2 rounded-lg transition-all text-[--mute] hover:text-[--ivory]">Verify</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="loginForm" onsubmit="event.preventDefault(); window.handleLogin();" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-[--mute] mb-1.5">Email Address</label>
+            <input type="email" id="loginEmail" required
+              class="field w-full rounded-xl px-4 py-2.5 text-sm text-white transition" placeholder="you@example.com">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-[--mute] mb-1.5">Password</label>
+            <input type="password" id="loginPassword" required
+              class="field w-full rounded-xl px-4 py-2.5 text-sm text-white transition" placeholder="••••••••">
+          </div>
+          <button type="submit" class="arch-btn w-full text-[--ivory] font-medium py-3 mt-2 text-sm tracking-wide transition">
+            Enter the Vault
+          </button>
+        </form>
+
+        <!-- Register Form -->
+        <form id="registerForm" onsubmit="event.preventDefault(); window.handleRegister();" class="space-y-4 hidden">
+          <div>
+            <label class="block text-xs font-medium text-[--mute] mb-1.5">Your Name</label>
+            <input type="text" id="registerName" required
+              class="field w-full rounded-xl px-4 py-2.5 text-sm text-white transition" placeholder="Ada Lovelace">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-[--mute] mb-1.5">Email Address</label>
+            <input type="email" id="registerEmail" required
+              class="field w-full rounded-xl px-4 py-2.5 text-sm text-white transition" placeholder="you@example.com">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-[--mute] mb-1.5">Password</label>
+            <input type="password" id="registerPassword" required
+              class="field w-full rounded-xl px-4 py-2.5 text-sm text-white transition" placeholder="Min. 8 characters">
+          </div>
+          <button type="submit" class="arch-btn w-full text-[--ivory] font-medium py-3 mt-2 text-sm tracking-wide transition">
+            Create Account
+          </button>
+        </form>
+
+        <!-- Verify Form -->
+        <form id="verifyForm" onsubmit="event.preventDefault(); window.handleVerify();" class="space-y-4 hidden">
+          <div>
+            <label class="block text-xs font-medium text-[--mute] mb-1.5">Email Address</label>
+            <input type="email" id="verifyEmail" required
+              class="field w-full rounded-xl px-4 py-2.5 text-sm text-white transition" placeholder="you@example.com">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-[--mute] mb-1.5">Verification Code</label>
+            <input type="text" id="verifyCode" required
+              class="field w-full rounded-xl px-4 py-2.5 text-sm text-white transition tracking-widest" placeholder="123456">
+          </div>
+          <button type="submit" class="arch-btn w-full text-[--ivory] font-medium py-3 mt-2 text-sm tracking-wide transition">
+            Verify Account
+          </button>
+        </form>
+
+        <div id="authStatus" class="mt-5 text-sm text-center min-h-[1.25rem] text-[--mute]"></div>
+      </div>
+      <p class="text-center text-xs text-[--mute] mt-6">Every photo, kept quietly under glass.</p>
+    </div>
+  </div>
+
+  <!-- Dashboard / Landing View -->
+  <main id="dashboardView" class="hidden flex-1 w-full">
+
+    <!-- Hero -->
+    <section class="relative overflow-hidden lattice border-b border-white/5">
+      <div class="absolute -top-32 -right-32 w-96 h-96 bg-[--amber] opacity-[0.08] rounded-full blur-3xl"></div>
+      <div class="absolute -bottom-32 -left-20 w-80 h-80 bg-[--moss] opacity-[0.08] rounded-full blur-3xl"></div>
+      <div class="relative max-w-6xl mx-auto px-6 sm:px-10 py-14 sm:py-20 flex flex-col sm:flex-row items-center sm:items-end gap-8 fade-up">
+
+        <!-- Avatar upload -->
+        <div class="relative shrink-0">
+          <div class="avatar-ring rounded-full w-28 h-28 sm:w-32 sm:h-32">
+            <div class="rounded-full w-full h-full bg-[--ink-2] overflow-hidden flex items-center justify-center">
+              <img id="avatarImg" src="" alt="" class="hidden w-full h-full object-cover">
+              <span id="avatarInitial" class="display text-4xl text-[--amber]">A</span>
+            </div>
+          </div>
+          <button onclick="document.getElementById('avatarInput').click()"
+            class="absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-[--ink] border border-[--amber]/40 flex items-center justify-center hover:bg-[--amber]/10 transition" title="Change photo">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8a24d" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 13.5V17a1 1 0 001 1h3.5L18.5 8a1.5 1.5 0 000-2.1L16.6 4a1.5 1.5 0 00-2.1 0L4 13.5z"/></svg>
+          </button>
+          <input type="file" id="avatarInput" accept="image/*" class="hidden" onchange="handleAvatarUpload(event)">
+        </div>
+
+        <div class="flex-1 text-center sm:text-left">
+          <p class="text-xs tracking-[0.25em] uppercase text-[--amber] mb-2">Good to see you</p>
+          <h1 id="greetingName" class="display text-4xl sm:text-5xl italic text-[--ivory] mb-2">Ada</h1>
+          <p class="text-sm text-[--mute] max-w-md">Your vault is quiet and undisturbed. Everything you've kept here stays yours alone.</p>
+        </div>
+
+        <a href="photos.html" class="arch-btn shrink-0 px-7 py-3 text-sm font-medium text-[--ivory] transition inline-flex items-center gap-2">
+          Open Photo Vault
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+      </div>
+    </section>
+
+    <!-- Body -->
+    <section class="max-w-3xl mx-auto px-6 sm:px-10 py-10">
+
+      <!-- Community Chat -->
+      <div class="panel rounded-3xl p-5 sm:p-6 flex flex-col h-[480px] fade-up">
+        <div class="flex items-center justify-between mb-3 border-b border-white/5 pb-3">
+          <h3 class="text-xs tracking-widest uppercase text-[--mute]">Community Chat</h3>
+          <span class="text-[11px] text-[--mute]/70">Visible to signed-in members only</span>
+        </div>
+        <div id="chatMessages" class="flex-1 overflow-y-auto space-y-3 pr-1 text-sm"></div>
+        <form id="chatForm" onsubmit="handleChatSubmit(event)" class="mt-3 flex gap-2">
+          <input type="text" id="chatInput" placeholder="Say something to the vault…" autocomplete="off"
+            class="field flex-1 rounded-xl px-3 py-2 text-sm text-white">
+          <button type="submit" class="arch-btn px-4 py-2 text-sm text-[--ivory]">Send</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import {
+      CognitoUserPool,
+      CognitoUserAttribute,
+      CognitoUser,
+      AuthenticationDetails
+    } from 'https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.12/+esm';
+
+    const awsConfig = {
+      region: "us-west-1",
+      userPoolId: "us-west-1_5qfSjDmtR",
+      clientId: "2aqsuu48jd5d0h1ncggvb32mm",
+      apiGatewayUrl: "https://y3ugwvt21m.execute-api.us-west-1.amazonaws.com"
+    };
+
+    const userPool = new CognitoUserPool({
+      UserPoolId: awsConfig.userPoolId,
+      ClientId: awsConfig.clientId
+    });
+
+    function setAuthStatus(message, type = 'info'){
+      const el = document.getElementById('authStatus');
+      const colors = { info: 'text-[--mute]', success: 'text-[--moss]', error: 'text-rose-400' };
+      el.className = `mt-5 text-sm text-center min-h-[1.25rem] ${colors[type] || colors.info}`;
+      el.textContent = message;
+    }
+
+    window.switchTab = function(tab){
+      const forms = { login: 'loginForm', register: 'registerForm', verify: 'verifyForm' };
+      const btns = { login: 'tabLoginBtn', register: 'tabRegisterBtn', verify: 'tabVerifyBtn' };
+      Object.entries(forms).forEach(([k, id]) => document.getElementById(id).classList.toggle('hidden', k !== tab));
+      Object.entries(btns).forEach(([k, id]) => {
+        document.getElementById(id).className = k === tab
+          ? 'py-2 rounded-lg transition-all text-[--ivory] bg-[--amber-soft]'
+          : 'py-2 rounded-lg transition-all text-[--mute] hover:text-[--ivory]';
+      });
+      setAuthStatus('');
+    };
+
+    // ---------------- Register ----------------
+    window.handleRegister = function(){
+      const name = document.getElementById('registerName').value.trim();
+      const email = document.getElementById('registerEmail').value.trim();
+      const password = document.getElementById('registerPassword').value;
+
+      if (!name || !email || !password) {
+        setAuthStatus('Please fill in all fields.', 'error');
+        return;
+      }
+
+      const attributeList = [
+        new CognitoUserAttribute({ Name: 'email', Value: email }),
+        new CognitoUserAttribute({ Name: 'name', Value: name })
+      ];
+
+      setAuthStatus('Creating your account…');
+      userPool.signUp(email, password, attributeList, null, (err) => {
+        if (err) { setAuthStatus(err.message || 'Registration failed.', 'error'); return; }
+        setAuthStatus('Account created — check your email for a code.', 'success');
+        document.getElementById('verifyEmail').value = email;
+        window.switchTab('verify');
+      });
+    };
+
+    // ---------------- Verify ----------------
+    window.handleVerify = function(){
+      const email = document.getElementById('verifyEmail').value.trim();
+      const code = document.getElementById('verifyCode').value.trim();
+      if (!email || !code) { setAuthStatus('Please fill in all fields.', 'error'); return; }
+
+      const cognitoUser = new CognitoUser({ Username: email, Pool: userPool });
+      setAuthStatus('Verifying…');
+      cognitoUser.confirmRegistration(code, true, (err) => {
+        if (err) { setAuthStatus(err.message || 'Verification failed.', 'error'); return; }
+        setAuthStatus('Verified — you can sign in now.', 'success');
+        document.getElementById('loginEmail').value = email;
+        window.switchTab('login');
+      });
+    };
+
+    // ---------------- Login ----------------
+    window.handleLogin = function(){
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      if (!email || !password) { setAuthStatus('Please fill in all fields.', 'error'); return; }
+
+      const authDetails = new AuthenticationDetails({ Username: email, Password: password });
+      const cognitoUser = new CognitoUser({ Username: email, Pool: userPool });
+
+      setAuthStatus('Signing in…');
+      cognitoUser.authenticateUser(authDetails, {
+        onSuccess: (session) => {
+          setAuthStatus('');
+          const idToken = session.getIdToken();
+          const payload = idToken.decodePayload();
+          const name = payload.name || email.split('@')[0];
+          localStorage.setItem('idToken', idToken.getJwtToken());
+          localStorage.setItem('userEmail', email);
+          localStorage.setItem('userName', name);
+          checkAuthState();
+        },
+        onFailure: (err) => setAuthStatus(err.message || 'Login failed.', 'error')
+      });
+    };
+
+    // ---------------- Sign out ----------------
+    window.signOut = function(){
+      const cognitoUser = userPool.getCurrentUser();
+      if (cognitoUser) cognitoUser.signOut();
+      localStorage.removeItem('idToken');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('userName');
+      checkAuthState();
+    };
+
+    // ---------------- UI state ----------------
+    function checkAuthState(){
+      const idToken = localStorage.getItem('idToken');
+      const name = localStorage.getItem('userName') || 'Friend';
+      const avatar = localStorage.getItem('userAvatar');
+      const loginView = document.getElementById('loginView');
+      const dashboardView = document.getElementById('dashboardView');
+      const navAuthSection = document.getElementById('navAuthSection');
+
+      if (idToken) {
+        loginView.classList.add('hidden');
+        dashboardView.classList.remove('hidden');
+        navAuthSection.innerHTML = `
+          <span class="hidden sm:inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[--mute] border border-white/5 bg-white/[0.02] rounded-full px-3 py-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-[--moss] glow-dot"></span>
+            All systems settled
+          </span>
+          <span class="text-[--mute]">${name}</span>
+          <button onclick="window.signOut()" class="text-[--amber] hover:text-[--ivory] transition">Sign Out</button>
+        `;
+        document.getElementById('greetingName').textContent = name;
+        document.getElementById('avatarInitial').textContent = name.charAt(0).toUpperCase();
+        if (avatar) {
+          document.getElementById('avatarImg').src = avatar;
+          document.getElementById('avatarImg').classList.remove('hidden');
+          document.getElementById('avatarInitial').classList.add('hidden');
+        }
+        renderChat();
+      } else {
+        loginView.classList.remove('hidden');
+        dashboardView.classList.add('hidden');
+        navAuthSection.innerHTML = `<span class="text-[--mute]">Not signed in</span>`;
+      }
+    }
+
+    window.handleAvatarUpload = function(event){
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        localStorage.setItem('userAvatar', e.target.result);
+        checkAuthState();
+      };
+      reader.readAsDataURL(file);
+    };
+
+    // ---------------- Community chat ----------------
+    const CHAT_KEY = 'gazeeboCommunityChat';
+
+    function loadChat(){ return JSON.parse(localStorage.getItem(CHAT_KEY) || '[]'); }
+    function saveChat(messages){ localStorage.setItem(CHAT_KEY, JSON.stringify(messages)); }
+
+    function renderChat(){
+      if (!localStorage.getItem('idToken')) return;
+      const currentName = localStorage.getItem('userName') || 'Friend';
+      const chat = document.getElementById('chatMessages');
+      const messages = loadChat();
+
+      if (messages.length === 0) {
+        chat.innerHTML = `<p class="text-xs text-[--mute]/70 text-center mt-4">No messages yet — be the first to say hello to the vault.</p>`;
+        return;
+      }
+
+      chat.innerHTML = messages.map(m => {
+        const mine = m.name === currentName;
+        return `
+          <div class="max-w-[85%] ${mine ? 'ml-auto text-right' : ''}">
+            <span class="block text-[10px] uppercase tracking-wider text-[--mute]/70 mb-1 ${mine ? 'text-right' : ''}">${m.name}</span>
+            <div class="${mine
+              ? 'bg-[--amber-soft] border border-[--amber]/20 rounded-2xl rounded-br-sm'
+              : 'bg-white/[0.04] border border-white/5 rounded-2xl rounded-bl-sm'} p-3 text-[--ivory] inline-block text-left">
+              ${m.text.replace(/</g,'&lt;')}
+            </div>
+          </div>
+        `;
+      }).join('');
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    window.handleChatSubmit = function(event){
+      event.preventDefault();
+      if (!localStorage.getItem('idToken')) return;
+
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const name = localStorage.getItem('userName') || 'Friend';
+      const messages = loadChat();
+      messages.push({ name, text, at: Date.now() });
+      saveChat(messages);
+
+      input.value = '';
+      renderChat();
+    };
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === CHAT_KEY) renderChat();
+    });
+
+    // ---------------- Restore session on load ----------------
+    (function initSession(){
+      const cognitoUser = userPool.getCurrentUser();
+      if (!cognitoUser) { checkAuthState(); return; }
+      cognitoUser.getSession((err, session) => {
+        if (err || !session || !session.isValid()) { checkAuthState(); return; }
+        const idToken = session.getIdToken();
+        const payload = idToken.decodePayload();
+        localStorage.setItem('idToken', idToken.getJwtToken());
+        localStorage.setItem('userEmail', payload.email || '');
+        localStorage.setItem('userName', payload.name || (payload.email ? payload.email.split('@')[0] : 'Friend'));
+        checkAuthState();
+      });
+    })();
+  </script>
+</body>
+</html>
