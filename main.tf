@@ -40,6 +40,22 @@ resource "aws_s3_bucket_public_access_block" "photos_block" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
+# ==========================================
+# S3 BUCKET CORS CONFIGURATION
+# ==========================================
+resource "aws_s3_bucket_cors_configuration" "photos_cors" {
+  bucket = aws_s3_bucket.photos_bucket.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["PUT", "POST", "GET"]
+    allowed_origins = [
+      "https://main.d1x75slbuwqfiz.amplifyapp.com",
+      "http://localhost:3000"
+    ]
+    expose_headers  = []
+  }
+}
 
 # ==========================================
 # 3. CLOUDFRONT CDN (Secure HTTPS Edge Routing)
