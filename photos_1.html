@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gazeebo — Photo Vault</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0a0d13; --ink-2:#0f131c;
+    --panel:rgba(22,27,38,0.62); --panel-strong:rgba(26,32,45,0.78);
+    --line-soft:rgba(255,255,255,0.07);
+    --amber:#e8a24d; --amber-soft:rgba(232,162,77,0.16);
+    --moss:#5b9d84; --ivory:#eef1f0; --mute:#8b93a0;
+  }
+  html,body{height:100%}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 12% -10%, rgba(232,162,77,0.10), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 0%, rgba(91,157,132,0.08), transparent 55%),
+      var(--ink);
+    color: var(--ivory); font-family:'Inter', sans-serif;
+  }
+  .display{ font-family:'Fraunces', serif; }
+  .lattice{
+    background-image:
+      repeating-linear-gradient(45deg, rgba(232,162,77,0.05) 0 1px, transparent 1px 26px),
+      repeating-linear-gradient(-45deg, rgba(232,162,77,0.05) 0 1px, transparent 1px 26px);
+  }
+  .panel{ background: var(--panel); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border:1px solid var(--line-soft); }
+  .panel-strong{ background: var(--panel-strong); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border:1px solid var(--line-soft); }
+  .arch-btn{
+    background: linear-gradient(180deg, rgba(232,162,77,0.18), rgba(232,162,77,0.06));
+    border:1px solid rgba(232,162,77,0.35);
+    border-radius: 999px 999px 14px 14px;
+  }
+  .arch-btn:hover{ background: linear-gradient(180deg, rgba(232,162,77,0.28), rgba(232,162,77,0.10)); }
+  .frame{
+    border:1px solid var(--line-soft);
+    background: rgba(255,255,255,0.02);
+  }
+  .frame:hover{ border-color: rgba(232,162,77,0.35); }
+  .drop-zone{ border:2px dashed rgba(255,255,255,0.12); transition:.2s; }
+  .drop-zone.dragover{ border-color: var(--amber); background: rgba(232,162,77,0.06); }
+  .fade-up{ animation: fadeUp .5s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes fadeUp{ from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:translateY(0)} }
+  .masonry{ column-count:1; column-gap:1rem; }
+  @media(min-width:640px){ .masonry{ column-count:2; } }
+  @media(min-width:1024px){ .masonry{ column-count:3; } }
+  .masonry > div{ break-inside: avoid; margin-bottom:1rem; }
+</style>
+</head>
+<body class="min-h-full flex flex-col">
+
+  <!-- Top Navigation -->
+  <header class="border-b border-white/5 px-6 sm:px-10 py-5 flex justify-between items-center">
+    <a href="index.html" class="flex items-center gap-2.5">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M13 2 L24 9 L24 10.5 L2 10.5 L2 9 Z" fill="#e8a24d"/>
+        <path d="M4 11.5 L4 22 M9 11.5 L9 22 M13 11.5 L13 22 M17 11.5 L17 22 M22 11.5 L22 22" stroke="#5b9d84" stroke-width="1.1" opacity="0.7"/>
+        <circle cx="13" cy="7" r="1.3" fill="#0a0d13"/>
+      </svg>
+      <span class="display text-lg tracking-tight text-[--ivory]">Gazeebo</span>
+    </a>
+    <div class="flex items-center gap-5 text-sm">
+      <a href="index.html" class="text-[--mute] hover:text-[--ivory] transition flex items-center gap-1.5">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Dashboard
+      </a>
+      <span id="photoCount" class="text-[--mute]">0 photos</span>
+    </div>
+  </header>
+
+  <main class="flex-1 w-full">
+    <!-- Hero -->
+    <section class="lattice border-b border-white/5">
+      <div class="max-w-6xl mx-auto px-6 sm:px-10 py-12 fade-up">
+        <p class="text-xs tracking-[0.25em] uppercase text-[--amber] mb-2">Under Glass</p>
+        <h1 class="display text-4xl italic text-[--ivory] mb-2">Your Photo Vault</h1>
+        <p class="text-sm text-[--mute] max-w-md">Every image here is kept private, encrypted, and yours alone to arrange.</p>
+      </div>
+    </section>
+
+    <section class="max-w-6xl mx-auto px-6 sm:px-10 py-10">
+
+      <!-- Upload dropzone -->
+      <div id="dropZone" class="drop-zone rounded-3xl p-10 text-center cursor-pointer mb-10 fade-up"
+           onclick="document.getElementById('fileInput').click()">
+        <input type="file" id="fileInput" accept="image/*" multiple class="hidden" onchange="window.handleFiles(this.files)">
+        <svg class="mx-auto mb-3" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#e8a24d" stroke-width="1.4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 7.5m0 0L7.5 12m4.5-4.5v13.5" />
+        </svg>
+        <p class="text-sm font-medium text-[--ivory]">Drag photos in, or click to choose</p>
+        <p class="text-xs text-[--mute] mt-1">Uploaded directly to your private S3 vault via a secure link.</p>
+      </div>
+
+      <div id="uploadStatus" class="text-sm text-center min-h-[1.25rem] -mt-6 mb-8 text-[--mute]"></div>
+
+      <div id="uploadProgressWrap" class="hidden -mt-6 mb-8 max-w-md mx-auto">
+        <div class="w-full h-1.5 rounded-full bg-white/5 overflow-hidden">
+          <div id="uploadProgressBar" class="h-full w-0 bg-[--amber] transition-all duration-300"></div>
+        </div>
+      </div>
+
+      <!-- Gallery -->
+      <div id="emptyState" class="text-center py-16 fade-up">
+        <p class="display italic text-2xl text-[--mute] mb-1">Nothing here yet</p>
+        <p class="text-sm text-[--mute]/70">Add your first photo above to begin filling the vault.</p>
+      </div>
+
+      <div id="gallery" class="masonry hidden"></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { CognitoUserPool } from 'https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.12/+esm';
+
+    // Require a real Cognito session (same idToken key index.html sets on login)
+    if (!localStorage.getItem('idToken')) {
+      window.location.href = 'index.html';
+    }
+
+    const awsConfig = {
+      region: "us-west-1",
+      userPoolId: "us-west-1_5qfSjDmtR",
+      clientId: "2aqsuu48jd5d0h1ncggvb32mm",
+      apiGatewayUrl: "https://y3ugwvt21m.execute-api.us-west-1.amazonaws.com"
+    };
+
+    const userPool = new CognitoUserPool({
+      UserPoolId: awsConfig.userPoolId,
+      ClientId: awsConfig.clientId
+    });
+
+    function getIdToken(){
+      return new Promise((resolve, reject) => {
+        const cognitoUser = userPool.getCurrentUser();
+        if (!cognitoUser) { reject(new Error('No authenticated user. Please log in again.')); return; }
+        cognitoUser.getSession((err, session) => {
+          if (err) { reject(err); return; }
+          if (!session.isValid()) { reject(new Error('Session expired. Please log in again.')); return; }
+          resolve(session.getIdToken().getJwtToken());
+        });
+      });
+    }
+
+    const STORAGE_KEY = 'gazeeboPhotos';
+    let photos = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+    function setUploadStatus(message, type = 'info'){
+      const el = document.getElementById('uploadStatus');
+      const colors = { info: 'text-[--mute]', success: 'text-[--moss]', error: 'text-rose-400' };
+      el.className = `text-sm text-center min-h-[1.25rem] -mt-6 mb-8 ${colors[type] || colors.info}`;
+      el.textContent = message;
+    }
+
+    function render(){
+      const gallery = document.getElementById('gallery');
+      const empty = document.getElementById('emptyState');
+      document.getElementById('photoCount').textContent = `${photos.length} photo${photos.length === 1 ? '' : 's'}`;
+
+      if (photos.length === 0) {
+        gallery.classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      gallery.classList.remove('hidden');
+      gallery.innerHTML = photos.map((p, i) => `
+        <div class="frame rounded-2xl overflow-hidden group relative">
+          <img src="${p.src}" alt="${p.name}" class="w-full block">
+          <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition flex items-end justify-between p-3">
+            <span class="text-xs text-[--ivory] truncate max-w-[70%]">${p.name}</span>
+            <button onclick="window.removePhoto(${i})" class="w-7 h-7 rounded-full bg-black/50 hover:bg-red-500/70 flex items-center justify-center transition">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path stroke-linecap="round" d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Uploads each file straight to S3 via a pre-signed URL from API Gateway
+    async function uploadOne(file){
+      const idToken = await getIdToken();
+
+      const presignResponse = await fetch(`${awsConfig.apiGatewayUrl}/upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': idToken },
+        body: JSON.stringify({ filename: file.name, filetype: file.type })
+      });
+      if (!presignResponse.ok) throw new Error(`Failed to get upload URL (status ${presignResponse.status})`);
+
+      const presignData = await presignResponse.json();
+      const uploadUrl = presignData.uploadUrl || presignData.url || presignData.presignedUrl;
+      if (!uploadUrl) throw new Error('No pre-signed URL returned from server.');
+
+      const putResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file
+      });
+      if (!putResponse.ok) throw new Error(`Upload to storage failed (status ${putResponse.status})`);
+
+      // Object's permanent URL (pre-signed URL minus the query string)
+      return uploadUrl.split('?')[0];
+    }
+
+    window.handleFiles = async function(fileList){
+      const files = [...fileList].filter(f => f.type.startsWith('image/'));
+      if (files.length === 0) return;
+
+      const progressWrap = document.getElementById('uploadProgressWrap');
+      const progressBar = document.getElementById('uploadProgressBar');
+      progressWrap.classList.remove('hidden');
+
+      let done = 0;
+      for (const file of files) {
+        setUploadStatus(`Uploading ${file.name}…`);
+        progressBar.style.width = `${Math.round((done / files.length) * 90) + 5}%`;
+        try {
+          const url = await uploadOne(file);
+          photos.push({ name: file.name, src: url });
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
+          render();
+        } catch (err) {
+          console.error(err);
+          setUploadStatus(err.message || `Failed to upload ${file.name}.`, 'error');
+        }
+        done++;
+      }
+
+      progressBar.style.width = '100%';
+      setUploadStatus(`Uploaded ${done} photo${done === 1 ? '' : 's'}.`, 'success');
+      setTimeout(() => {
+        progressWrap.classList.add('hidden');
+        progressBar.style.width = '0%';
+        setUploadStatus('');
+      }, 1500);
+    };
+
+    window.removePhoto = function(index){
+      // Removes from this device's local gallery record only — does not
+      // delete the object from S3 (wire a DELETE endpoint to do that).
+      photos.splice(index, 1);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
+      render();
+    };
+
+    const dropZone = document.getElementById('dropZone');
+    ['dragenter','dragover'].forEach(evt => dropZone.addEventListener(evt, e => {
+      e.preventDefault(); e.stopPropagation(); dropZone.classList.add('dragover');
+    }));
+    ['dragleave','drop'].forEach(evt => dropZone.addEventListener(evt, e => {
+      e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('dragover');
+    }));
+    dropZone.addEventListener('drop', e => window.handleFiles(e.dataTransfer.files));
+
+    render();
+  </script>
+</body>
+</html>
