@@ -178,21 +178,3 @@ resource "aws_cognito_user_pool_client" "client" {
   prevent_user_existence_errors = "ENABLED"
 }
 
-# ==========================================
-# 6. OUTPUTS
-# ==========================================
-output "cognito_user_pool_id" {
-  value = aws_cognito_user_pool.pool.id
-}
-
-output "cognito_client_id" {
-  value = aws_cognito_user_pool_client.client.id
-}
-
-output "cloudfront_domain_url" {
-  value = "https://${aws_cloudfront_distribution.cdn.domain_name}"
-}
-
-output "photos_bucket_name" {
-  value = aws_s3_bucket.photos_bucket.id
-}
