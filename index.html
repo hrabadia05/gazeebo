@@ -6,8 +6,8 @@
     <title>Gazeebo Portal</title>
     <!-- Tailwind CSS for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Amazon Cognito Identity SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
+    <!-- Amazon Cognito Identity SDK (unpkg fallback) -->
+    <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
@@ -197,7 +197,13 @@
             UserPoolId: awsConfig.userPoolId,
             ClientId: awsConfig.clientId
         };
-        const userPool = new AmazonCognitoIdentityServiceProvider.CognitoUserPool(poolData);
+        let userPool;
+        try {
+            userPool = new AmazonCognitoIdentityServiceProvider.CognitoUserPool(poolData);
+        } catch (e) {
+            console.error("Cognito SDK failed to initialize:", e);
+        }
+        
         let registeringEmail = "";
 
         window.onload = function() {
@@ -289,6 +295,7 @@
         }
 
         function checkUserSession() {
+            if (!userPool) return;
             const cognitoUser = userPool.getCurrentUser();
             if (cognitoUser != null) {
                 cognitoUser.getSession(function(err, session) {
@@ -306,6 +313,7 @@
         }
 
         function signOut() {
+            if (!userPool) return;
             const cognitoUser = userPool.getCurrentUser();
             if (cognitoUser != null) {
                 cognitoUser.signOut();
