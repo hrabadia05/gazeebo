@@ -29,14 +29,6 @@
       repeating-linear-gradient(45deg, rgba(232,162,77,0.05) 0 1px, transparent 1px 26px),
       repeating-linear-gradient(-45deg, rgba(232,162,77,0.05) 0 1px, transparent 1px 26px);
   }
-  .panel{ background: var(--panel); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border:1px solid var(--line-soft); }
-  .panel-strong{ background: var(--panel-strong); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border:1px solid var(--line-soft); }
-  .arch-btn{
-    background: linear-gradient(180deg, rgba(232,162,77,0.18), rgba(232,162,77,0.06));
-    border:1px solid rgba(232,162,77,0.35);
-    border-radius: 999px 999px 14px 14px;
-  }
-  .arch-btn:hover{ background: linear-gradient(180deg, rgba(232,162,77,0.28), rgba(232,162,77,0.10)); }
   .frame{
     border:1px solid var(--line-soft);
     background: rgba(255,255,255,0.02);
@@ -66,7 +58,6 @@
     </a>
     <div class="flex items-center gap-5 text-sm">
       <a href="index.html" class="text-[--mute] hover:text-[--ivory] transition flex items-center gap-1.5">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 19l-7-7 7-7"/></svg>
         Dashboard
       </a>
       <span id="photoCount" class="text-[--mute]">0 photos</span>
@@ -74,12 +65,11 @@
   </header>
 
   <main class="flex-1 w-full">
-    <!-- Hero -->
     <section class="lattice border-b border-white/5">
       <div class="max-w-6xl mx-auto px-6 sm:px-10 py-12 fade-up">
         <p class="text-xs tracking-[0.25em] uppercase text-[--amber] mb-2">Under Glass</p>
         <h1 class="display text-4xl italic text-[--ivory] mb-2">Your Photo Vault</h1>
-        <p class="text-sm text-[--mute] max-w-md">Every image here is kept private, encrypted, and yours alone to arrange.</p>
+        <p class="text-sm text-[--mute] max-w-md">Every image here is kept private, encrypted, and synced directly from your S3 bucket.</p>
       </div>
     </section>
 
@@ -93,7 +83,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 7.5m0 0L7.5 12m4.5-4.5v13.5" />
         </svg>
         <p class="text-sm font-medium text-[--ivory]">Drag photos in, or click to choose</p>
-        <p class="text-xs text-[--mute] mt-1">Uploaded directly to your private S3 vault via a secure link.</p>
+        <p class="text-xs text-[--mute] mt-1">Uploaded directly to your private S3 vault.</p>
       </div>
 
       <div id="uploadStatus" class="text-sm text-center min-h-[1.25rem] -mt-6 mb-8 text-[--mute]"></div>
@@ -117,7 +107,6 @@
   <script type="module">
     import { CognitoUserPool } from 'https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.12/+esm';
 
-    // Require a real Cognito session (same idToken key index.html sets on login)
     if (!localStorage.getItem('idToken')) {
       window.location.href = 'index.html';
     }
@@ -146,14 +135,29 @@
       });
     }
 
-    const STORAGE_KEY = 'gazeeboPhotos';
-    let photos = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    let photos = [];
 
     function setUploadStatus(message, type = 'info'){
       const el = document.getElementById('uploadStatus');
       const colors = { info: 'text-[--mute]', success: 'text-[--moss]', error: 'text-rose-400' };
       el.className = `text-sm text-center min-h-[1.25rem] -mt-6 mb-8 ${colors[type] || colors.info}`;
       el.textContent = message;
+    }
+
+    async function fetchGallery() {
+      try {
+        const idToken = await getIdToken();
+        const res = await fetch(`${awsConfig.apiGatewayUrl}/upload`, {
+          method: 'GET',
+          headers: { 'Authorization': idToken }
+        });
+        if (!res.ok) throw new Error('Failed to load vault pictures.');
+        const data = await res.json();
+        photos = data.photos || [];
+        render();
+      } catch (err) {
+        console.error(err);
+      }
     }
 
     function render(){
@@ -170,10 +174,10 @@
       gallery.classList.remove('hidden');
       gallery.innerHTML = photos.map((p, i) => `
         <div class="frame rounded-2xl overflow-hidden group relative">
-          <img src="${p.src}" alt="${p.name}" class="w-full block">
+          <img src="${p.url}" alt="${p.key}" class="w-full block">
           <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition flex items-end justify-between p-3">
-            <span class="text-xs text-[--ivory] truncate max-w-[70%]">${p.name}</span>
-            <button onclick="window.removePhoto(${i})" class="w-7 h-7 rounded-full bg-black/50 hover:bg-red-500/70 flex items-center justify-center transition">
+            <span class="text-xs text-[--ivory] truncate max-w-[70%]">${p.key.split('/').pop()}</span>
+            <button onclick="window.removePhoto('${p.key}')" class="w-7 h-7 rounded-full bg-black/50 hover:bg-red-500/70 flex items-center justify-center transition">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path stroke-linecap="round" d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
@@ -181,7 +185,6 @@
       `).join('');
     }
 
-    // Uploads each file straight to S3 via a pre-signed URL from API Gateway
     async function uploadOne(file){
       const idToken = await getIdToken();
 
@@ -193,7 +196,7 @@
       if (!presignResponse.ok) throw new Error(`Failed to get upload URL (status ${presignResponse.status})`);
 
       const presignData = await presignResponse.json();
-      const uploadUrl = presignData.uploadUrl || presignData.url || presignData.presignedUrl;
+      const uploadUrl = presignData.uploadUrl;
       if (!uploadUrl) throw new Error('No pre-signed URL returned from server.');
 
       const putResponse = await fetch(uploadUrl, {
@@ -202,9 +205,6 @@
         body: file
       });
       if (!putResponse.ok) throw new Error(`Upload to storage failed (status ${putResponse.status})`);
-
-      // Object's permanent URL (pre-signed URL minus the query string)
-      return uploadUrl.split('?')[0];
     }
 
     window.handleFiles = async function(fileList){
@@ -220,10 +220,7 @@
         setUploadStatus(`Uploading ${file.name}…`);
         progressBar.style.width = `${Math.round((done / files.length) * 90) + 5}%`;
         try {
-          const url = await uploadOne(file);
-          photos.push({ name: file.name, src: url });
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
-          render();
+          await uploadOne(file);
         } catch (err) {
           console.error(err);
           setUploadStatus(err.message || `Failed to upload ${file.name}.`, 'error');
@@ -233,6 +230,9 @@
 
       progressBar.style.width = '100%';
       setUploadStatus(`Uploaded ${done} photo${done === 1 ? '' : 's'}.`, 'success');
+      
+      await fetchGallery();
+
       setTimeout(() => {
         progressWrap.classList.add('hidden');
         progressBar.style.width = '0%';
@@ -240,12 +240,22 @@
       }, 1500);
     };
 
-    window.removePhoto = function(index){
-      // Removes from this device's local gallery record only — does not
-      // delete the object from S3 (wire a DELETE endpoint to do that).
-      photos.splice(index, 1);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
-      render();
+    window.removePhoto = async function(key){
+      if (!confirm("Are you sure you want to delete this photo from your vault?")) return;
+      try {
+        const idToken = await getIdToken();
+        const res = await fetch(`${awsConfig.apiGatewayUrl}/upload`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', 'Authorization': idToken },
+          body: JSON.stringify({ key })
+        });
+        if (!res.ok) throw new Error('Failed to delete photo');
+        
+        await fetchGallery();
+      } catch (err) {
+        console.error(err);
+        alert('Could not delete photo.');
+      }
     };
 
     const dropZone = document.getElementById('dropZone');
@@ -257,7 +267,7 @@
     }));
     dropZone.addEventListener('drop', e => window.handleFiles(e.dataTransfer.files));
 
-    render();
+    fetchGallery();
   </script>
 </body>
 </html>
