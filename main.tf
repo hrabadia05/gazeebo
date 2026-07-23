@@ -4,9 +4,9 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  account_id           = data.aws_caller_identity.current.account_id
-  photos_bucket_name   = "gazeebo-private-photos-${local.account_id}"
-  website_bucket_name  = "gazeebo-website-frontend-${local.account_id}"
+  account_id          = data.aws_caller_identity.current.account_id
+  bucket_name         = "gazeebo-private-photos-${local.account_id}"
+  website_bucket_name = "gazeebo-website-frontend-${local.account_id}"
 }
 
 # ==========================================
@@ -14,7 +14,7 @@ locals {
 # ==========================================
 # Private Photos Bucket
 resource "aws_s3_bucket" "photos_bucket" {
-  bucket        = local.photos_bucket_name
+  bucket        = local.bucket_name
   force_destroy = false
 }
 
@@ -195,8 +195,8 @@ resource "aws_iam_policy" "lambda_s3_policy" {
           "s3:ListBucket"
         ]
         Resource = [
-          "arn:aws:s3:::${local.photos_bucket_name}",
-          "arn:aws:s3:::${local.photos_bucket_name}/*"
+          "arn:aws:s3:::${local.bucket_name}",
+          "arn:aws:s3:::${local.bucket_name}/*"
         ]
       }
     ]
@@ -223,7 +223,7 @@ resource "aws_iam_policy" "lambda_dynamodb_policy" {
           "dynamodb:UpdateItem",
           "dynamodb:Scan"
         ]
-        Resource = "arn:aws:dynamodb:${var.aws_region}:${local.account_id}:table/${var.dynamodb_table_name}"
+        Resource = "arn:aws:dynamodb:us-west-1:${local.account_id}:table/GazeeboPortalData"
       }
     ]
   })
@@ -250,7 +250,7 @@ const s3 = new S3Client({ region: process.env.AWS_REGION || "us-west-1" });
 const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION || "us-west-1" });
 const dynamodb = DynamoDBDocumentClient.from(ddbClient);
 
-const TABLE_NAME = process.env.TABLE_NAME || "GazeeboPortalData";
+const TABLE_NAME = "GazeeboPortalData";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -263,27 +263,46 @@ exports.handler = async (event) => {
     
     const httpMethod = event.requestContext?.http?.method || event.httpMethod;
     if (httpMethod === 'OPTIONS') {
-        return { statusCode: 200, headers: corsHeaders, body: "" };
+        return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: ""
+        };
     }
     
     try {
         const bucketName = process.env.BUCKET_NAME;
-        if (!bucketName) throw new Error("BUCKET_NAME env var not set.");
+        if (!bucketName) {
+            throw new Error("BUCKET_NAME environment variable is not set on Lambda function.");
+        }
 
         if (httpMethod === 'GET') {
-            const command = new ListObjectsV2Command({ Bucket: bucketName, Prefix: 'photos/' });
+            const command = new ListObjectsV2Command({
+                Bucket: bucketName,
+                Prefix: 'photos/'
+            });
+            
             const response = await s3.send(command);
             const photos = [];
 
             if (response.Contents) {
                 for (const item of response.Contents) {
                     if (item.Key.endsWith('/') || item.Size === 0) continue;
-                    const getCommand = new GetObjectCommand({ Bucket: bucketName, Key: item.Key });
+
+                    const getCommand = new GetObjectCommand({
+                        Bucket: bucketName,
+                        Key: item.Key
+                    });
                     const viewUrl = await getSignedUrl(s3, getCommand, { expiresIn: 3600 });
                     photos.push({ key: item.Key, url: viewUrl, lastModified: item.LastModified });
                 }
             }
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(photos) };
+
+            return {
+                statusCode: 200,
+                headers: corsHeaders,
+                body: JSON.stringify(photos),
+            };
         }
 
         if (httpMethod === 'POST') {
@@ -292,36 +311,76 @@ exports.handler = async (event) => {
             const filetype = body.filetype || 'application/octet-stream';
 
             if (!filename) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: "Missing filename" }) };
+                return {
+                    statusCode: 400,
+                    headers: corsHeaders,
+                    body: JSON.stringify({ error: "Missing filename in request body" }),
+                };
             }
 
             const objectKey = `photos/$${Date.now()}-$${filename}`;
-            const putCommand = new PutObjectCommand({ Bucket: bucketName, Key: objectKey, ContentType: filetype });
-            const uploadUrl = await getSignedUrl(s3, putCommand, { expiresIn: 300 });
+            const putCommand = new PutObjectCommand({
+                Bucket: bucketName,
+                Key: objectKey,
+                ContentType: filetype,
+            });
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ uploadUrl, fileKey: objectKey }) };
+            const uploadUrl = await getSignedUrl(s3, putCommand, { 
+                expiresIn: 300
+            });
+
+            return {
+                statusCode: 200,
+                headers: corsHeaders,
+                body: JSON.stringify({ uploadUrl, fileKey: objectKey }),
+            };
         }
 
         if (httpMethod === 'DELETE') {
             const photoKey = event.queryStringParameters?.key || event.queryStringParameters?.fileKey;
+            
             if (!photoKey) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: "Missing key parameter" }) };
+                return {
+                    statusCode: 400,
+                    headers: corsHeaders,
+                    body: JSON.stringify({ error: "Missing 'key' query parameter for deletion." })
+                };
             }
 
-            await s3.send(new DeleteObjectCommand({ Bucket: bucketName, Key: photoKey }));
+            await s3.send(new DeleteObjectCommand({
+                Bucket: bucketName,
+                Key: photoKey
+            }));
+
             try {
-                await dynamodb.send(new DeleteCommand({ TableName: TABLE_NAME, Key: { id: photoKey } }));
+                await dynamodb.send(new DeleteCommand({
+                    TableName: TABLE_NAME,
+                    Key: { id: photoKey }
+                }));
             } catch (dbErr) {
-                console.warn("DynamoDB delete warning:", dbErr);
+                console.warn("DynamoDB item delete warning:", dbErr);
             }
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: "Photo deleted", key: photoKey }) };
+            return {
+                statusCode: 200,
+                headers: corsHeaders,
+                body: JSON.stringify({ message: "Photo deleted successfully", key: photoKey })
+            };
         }
 
-        return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: `Method $${httpMethod} unsupported.` }) };
+        return {
+            statusCode: 404,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: `Route or method $${httpMethod} not supported.` })
+        };
+
     } catch (error) {
         console.error("Error:", error);
-        return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: error.message }) };
+        return {
+            statusCode: 500,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: error.message }),
+        };
     }
 };
 EOF
@@ -339,8 +398,7 @@ resource "aws_lambda_function" "api_lambda" {
 
   environment {
     variables = {
-      BUCKET_NAME = local.photos_bucket_name
-      TABLE_NAME  = var.dynamodb_table_name
+      BUCKET_NAME = local.bucket_name
     }
   }
 }
@@ -359,7 +417,6 @@ resource "aws_apigatewayv2_api" "http_api" {
   }
 }
 
-# JWT Authorizer for Cognito
 resource "aws_apigatewayv2_authorizer" "cognito" {
   api_id           = aws_apigatewayv2_api.http_api.id
   authorizer_type  = "JWT"
