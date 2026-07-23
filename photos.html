@@ -144,10 +144,22 @@
       el.textContent = message;
     }
 
-    const data = await res.json();
-        // Change data.photos to data directly:
+    async function fetchGallery(){
+      try {
+        const idToken = await getIdToken();
+        const res = await fetch(`${awsConfig.apiGatewayUrl}/upload`, {
+          method: 'GET',
+          headers: { 'Authorization': idToken }
+        });
+        if (!res.ok) throw new Error('Failed to load vault pictures.');
+        
+        const data = await res.json();
         photos = Array.isArray(data) ? data : (data.photos || []);
         render();
+      } catch (err) {
+        console.error("Gallery fetch error:", err);
+      }
+    }
 
     function render(){
       const gallery = document.getElementById('gallery');
@@ -235,10 +247,18 @@
         const idToken = await getIdToken();
         const res = await fetch(`${awsConfig.apiGatewayUrl}/upload`, {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json', 'Authorization': idToken },
-          body: JSON.stringify({ key })
+          headers: { 'Authorization': idToken },
+          // Use query parameter matching what Lambda expects: event.queryStringParameters.key
         });
-        if (!res.ok) throw new Error('Failed to delete photo');
+        // Note: If your lambda expects query parameters for delete, pass it in URL:
+        // const res = await fetch(`${awsConfig.apiGatewayUrl}/upload?key=${encodeURIComponent(key)}`, { ... });
+        
+        // Alternatively, since your Lambda reads query parameters for DELETE, let's target it via query string:
+        const deleteRes = await fetch(`${awsConfig.apiGatewayUrl}/upload?key=${encodeURIComponent(key)}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': idToken }
+        });
+        if (!deleteRes.ok) throw new Error('Failed to delete photo');
         
         await fetchGallery();
       } catch (err) {
