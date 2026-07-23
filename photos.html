@@ -144,21 +144,10 @@
       el.textContent = message;
     }
 
-    async function fetchGallery() {
-      try {
-        const idToken = await getIdToken();
-        const res = await fetch(`${awsConfig.apiGatewayUrl}/upload`, {
-          method: 'GET',
-          headers: { 'Authorization': idToken }
-        });
-        if (!res.ok) throw new Error('Failed to load vault pictures.');
-        const data = await res.json();
-        photos = data.photos || [];
+    const data = await res.json();
+        // Change data.photos to data directly:
+        photos = Array.isArray(data) ? data : (data.photos || []);
         render();
-      } catch (err) {
-        console.error(err);
-      }
-    }
 
     function render(){
       const gallery = document.getElementById('gallery');
